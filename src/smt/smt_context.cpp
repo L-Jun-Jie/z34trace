@@ -1703,8 +1703,10 @@ namespace smt {
                 scoped_suspend_rlimit _suspend_cancel(m.limit(), at_base_level());
                 if (!bcp())
                     return false;
+
                 if (!propagate_th_case_split(qhead))
                     return false;
+
                 SASSERT(!inconsistent());
                 propagate_relevancy(qhead);
                 if (inconsistent())
@@ -1717,6 +1719,7 @@ namespace smt {
                 propagate_th_diseqs();
                 if (inconsistent())
                     return false;
+
                 if (!propagate_theories()) // LA theory solving
                     return false;
             }

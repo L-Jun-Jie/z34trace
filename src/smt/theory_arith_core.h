@@ -1094,22 +1094,24 @@ namespace smt {
         atom_kind kind1 = a1->get_atom_kind();
         atom_kind kind2 = a2->get_atom_kind();
         bool v_is_int = is_int(v);
-        SASSERT(v == a2->get_var());
+        SASSERT(v == a2->get_var()); // the variables in a1 a2 are identical.
         if (k1 == k2 && kind1 == kind2) return;
         SASSERT(k1 != k2 || kind1 != kind2);
         parameter coeffs[3] = { parameter(symbol("farkas")),
                                 parameter(rational(1)), parameter(rational(1)) };
 
         if (kind1 == A_LOWER) {
-            if (kind2 == A_LOWER) {
+            if (kind2 == A_LOWER) { // both atoms have lower bound
                 if (k2 <= k1) {
+                    // x >= k1, x >= k2, k1 >= k2 => x >= k1 -> x >= k2
                     mk_clause(~l1, l2, 3, coeffs);
                 }
                 else {
+                    // x >= k1, x >= k2, k1 < k2 => x >= k2 -> x >= k1 
                     mk_clause(l1, ~l2, 3, coeffs);
                 }
             }
-            else if (k1 <= k2) {
+            else if (k1 <= k2) { // a1 has lower bound, a2 has upper bound
                 // k1 <= k2, k1 <= x or x <= k2
                 mk_clause(l1, l2, 3, coeffs);
             }
@@ -1168,7 +1170,7 @@ namespace smt {
                 }
             }
             CTRACE("arith", atoms.size() > 1, for (auto* a : atoms) a->display(*this, tout) << "\n";);
-            ptr_vector<atom> occs(m_var_occs[v]);
+            ptr_vector<atom> occs(m_var_occs[v]); // occurrences
 
             std::sort(atoms.begin(), atoms.end(), compare_atoms());
             std::sort(occs.begin(), occs.end(), compare_atoms());
@@ -1176,11 +1178,13 @@ namespace smt {
             typename atoms::iterator begin1 = occs.begin();
             typename atoms::iterator begin2 = occs.begin();
             typename atoms::iterator end = occs.end();
-            begin1 = first(A_LOWER, begin1, end);
-            begin2 = first(A_UPPER, begin2, end);
+            begin1 = first(A_LOWER, begin1, end); // the first atom with a lower bound
+            begin2 = first(A_UPPER, begin2, end); // the first atom with an upper bound
 
-            typename atoms::iterator lo_inf = begin1, lo_sup = begin1;
-            typename atoms::iterator hi_inf = begin2, hi_sup = begin2;
+            typename atoms::iterator lo_inf = begin1, lo_sup = begin1;  // lo_inf: atomic propositions with a lower bound of negative infinity
+                                                                        // lo_sup: atomic propositions whose lower bound is a specific value
+            typename atoms::iterator hi_inf = begin2, hi_sup = begin2;  // hi_inf: atomic propositions with an upper bound of positive infinity
+                                                                        // hi_sup: atomic propositions whose upper bound is a specific value
             typename atoms::iterator lo_inf1 = begin1, lo_sup1 = begin1;
             typename atoms::iterator hi_inf1 = begin2, hi_sup1 = begin2;
             bool flo_inf, fhi_inf, flo_sup, fhi_sup;
@@ -1195,7 +1199,7 @@ namespace smt {
                 if (lo_sup1 != end) lo_sup = lo_sup1;
                 if (hi_inf1 != end) hi_inf = hi_inf1;
                 if (hi_sup1 != end) hi_sup = hi_sup1;
-                if (!flo_inf) lo_inf = end;
+                if (!flo_inf) lo_inf = end; // fail to find target atom
                 if (!fhi_inf) hi_inf = end;
                 if (!flo_sup) lo_sup = end;
                 if (!fhi_sup) hi_sup = end;
@@ -1578,8 +1582,11 @@ namespace smt {
 
         flush_bound_axioms();
         propagate_linear_monomials();
-        while (m_asserted_qhead < m_asserted_bounds.size()) { // assert bound of base ?
+        while (m_asserted_qhead < m_asserted_bounds.size()) { // assert bounds
             bound * b = m_asserted_bounds[m_asserted_qhead];
+            
+            b->display(*this, std::cout);
+
             m_asserted_qhead++;
             if (!assert_bound(b)) {
                 failed();
@@ -2689,21 +2696,30 @@ namespace smt {
     */
     template<typename Ext>
     unsigned theory_arith<Ext>::imply_bound_for_monomial(row const & r, int idx, bool is_lower) {
-        row_entry const & entry = r[idx];
+        row_entry const & entry = r[idx]; // coeff & var
         unsigned count = 0;
         if (m_unassigned_atoms[entry.m_var] > 0) {
-            inf_numeral implied_k;
+            inf_numeral implied_k; // default 0
             typename vector<row_entry>::const_iterator it  = r.begin_entries();
             typename vector<row_entry>::const_iterator end = r.end_entries();
-            for (int idx2 = 0; it != end; ++it, ++idx2) {
+            
+            // std::cout << "init implied_k: " << implied_k << "\n";
+
+            for (int idx2 = 0; it != end; ++it, ++idx2) { // disregard idx rows
+                // std::cout << "idx2: " << idx2 << " val: " << it->m_var << "\n";
                 if (!it->is_dead() && idx != idx2) {
                     bound * b  = get_bound(it->m_var, is_lower ? it->m_coeff.is_pos() : it->m_coeff.is_neg());
                     SASSERT(b);
+
+                    // std::cout << "var:" << b->get_var() 
+                    //           << " bound:" << b->get_value()
+                    //           << " bound_kind:" << b->get_bound_kind() << "\n";
+
                     // implied_k -= it->m_coeff * b->get_value();
                     implied_k.submul(it->m_coeff, b->get_value());
                 }
             }
-            implied_k /= entry.m_coeff;
+            implied_k /= entry.m_coeff; // value of r[idx] (base)
             if (entry.m_coeff.is_pos() == is_lower) { // the current constraint has a lower bound
                 // implied_k is a lower bound for entry.m_var
                 bound * curr = lower(entry.m_var);
@@ -2858,6 +2874,7 @@ namespace smt {
                     // limit_k1 += delta * coeff;
                     limit_k1.addmul(inv_coeff, delta);
                 }
+                // std::cout << "k_1:" << k_1 << "\n";
                 TRACE("propagate_bounds_bug", tout << "is_b_lower: " << is_b_lower << " k1: " << k_1 << " limit_k1: "
                       << limit_k1 << " delta: " << delta << " coeff: " << coeff << "\n";);
                 inf_numeral k_2 = k_1;

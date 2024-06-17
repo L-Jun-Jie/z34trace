@@ -204,7 +204,7 @@ public:
             lbool r;
             try {
                 if (assumptions.empty() && !m_user_ctx)
-                    r = m_ctx->setup_and_check();
+                    r = m_ctx->setup_and_check(); // check
                 else
                     r = m_ctx->check(assumptions.size(), assumptions.data());
             }
@@ -227,7 +227,7 @@ public:
                 // store the model in a no-op model converter, and filter fresh Booleans
                 if (in->models_enabled()) {
                     model_ref md;
-                    m_ctx->get_model(md);
+                    m_ctx->get_model(md); // get model
                     buffer<symbol> r;
                     m_ctx->get_relevant_labels(nullptr, r);
                     labels_vec rv;

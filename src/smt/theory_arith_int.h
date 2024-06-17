@@ -971,7 +971,7 @@ namespace smt {
                       numeral f2 = ceil(get_value(v).get_rational()) - get_value(v).get_rational();
                       if (f2 < f1)
                           f1 = f2;
-                      tout << "v" << v << " -> " << f1 << " ";
+                      tout << "v" << v << " -> " << f1 << " "; // min {distance to floor, distance to ceil}
                       display_var(tout, v);
                   }
               });
@@ -982,8 +982,8 @@ namespace smt {
               int num = get_num_vars();
               for (theory_var v = 0; v < num; v++) {
                   if (is_int(v) && !get_value(v).is_int()) {
-                      numeral f1 = get_value(v).get_rational() - floor(get_value(v).get_rational());
-                      numeral f2 = ceil(get_value(v).get_rational()) - get_value(v).get_rational();
+                      numeral f1 = get_value(v).get_rational() - floor(get_value(v).get_rational()); // distance to floor
+                      numeral f2 = ceil(get_value(v).get_rational()) - get_value(v).get_rational(); // distance to ceil
                       if (f1 < min) min = f1;
                       if (f2 < min) min = f2;
                       if (f1 > max) max = f1;
